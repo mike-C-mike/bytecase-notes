@@ -1,0 +1,32 @@
+{
+  "department_name": "Example Police Department",
+  "unit_name": "Digital Evidence Unit",
+  "default_examiner": "Example Examiner",
+  "examiners": [
+    "Example Examiner",
+    "Second Example Examiner"
+  ],
+  "appearance": {
+    "theme": "system"
+  },
+  "output_paths": {
+    "base_output_dir": "",
+    "reports_folder_name": "reports",
+    "saved_notes_folder_name": "saved_notes"
+  },
+  "report_defaults": {
+    "export_txt": true,
+    "export_docx": true
+  },
+  "artifact_categories": [
+    "Communication",
+    "Account / User",
+    "Media",
+    "Location",
+    "Browser / Internet",
+    "File System",
+    "Application Data",
+    "System / Device",
+    "Other"
+  ]
+}
