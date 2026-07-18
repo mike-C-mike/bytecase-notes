@@ -2,6 +2,9 @@
   "department_name": "Example Police Department",
   "unit_name": "Digital Evidence Unit",
   "default_examiner": "Example Examiner",
+  "branding": {
+    "department_patch_path": "C:/Path/To/department_patch.png"
+  },
   "examiners": [
     "Example Examiner",
     "Second Example Examiner"

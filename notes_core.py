@@ -15,6 +15,13 @@ ARTIFACT_REF_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff"}
+
+
+def is_supported_image_path(path: str) -> bool:
+    """Return True when the path looks like a supported department patch image."""
+    return Path(path).suffix.lower() in IMAGE_EXTENSIONS
+
 
 def normalize_artifact_reference(number: str) -> str:
     """Return the standard ART-### form for a captured artifact reference number."""
@@ -165,6 +172,43 @@ def load_notes_json(path: str) -> Dict[str, object]:
     return record
 
 
+def copy_department_patch(record: Dict[str, object], branding_dir: Path) -> Dict[str, object]:
+    """Copy the configured department patch/logo into the case notes branding folder.
+
+    The original settings path is preserved in the record for transparency. A copied
+    path is also stored so exported JSON/TXT/DOCX outputs can point to the file
+    preserved with the case notes packet.
+    """
+    updated = copy.deepcopy(record)
+    department = updated.setdefault("department", {})
+    original_path = str(department.get("department_patch_path", "")).strip()
+
+    if not original_path:
+        return updated
+
+    source_path = Path(original_path)
+    if not source_path.exists() or not source_path.is_file():
+        department["department_patch_copy_error"] = "Department patch path was not found or was not a file."
+        return updated
+
+    if not is_supported_image_path(str(source_path)):
+        department["department_patch_copy_error"] = "Department patch file type is not a supported image format."
+        return updated
+
+    branding_dir.mkdir(parents=True, exist_ok=True)
+    destination_name = f"department_patch{source_path.suffix.lower()}"
+    destination_path = branding_dir / destination_name
+
+    try:
+        shutil.copy2(source_path, destination_path)
+        department["copied_department_patch"] = str(destination_path)
+        department["department_patch_name"] = destination_path.name
+    except OSError as exc:
+        department["department_patch_copy_error"] = str(exc)
+
+    return updated
+
+
 def copy_supporting_files(record: Dict[str, object], attachments_dir: Path) -> Dict[str, object]:
     updated = copy.deepcopy(record)
     attachments_dir.mkdir(parents=True, exist_ok=True)
@@ -222,6 +266,7 @@ def build_notes_record(
         "department": {
             "department_name": settings.get("department_name", ""),
             "unit_name": settings.get("unit_name", ""),
+            "department_patch_path": settings.get("branding", {}).get("department_patch_path", ""),
         },
         "case_info": {
             "case_number": case_number.strip(),
@@ -256,6 +301,11 @@ def build_txt_notes(record: Dict[str, object]) -> str:
     lines.append(f"Created At: {record.get('created_at', '')}")
     lines.append(f"Department / Agency: {department.get('department_name', '')}")
     lines.append(f"Unit: {department.get('unit_name', '')}")
+    lines.append(f"Department Patch / Logo: {department.get('department_patch_path', '')}")
+    if department.get("copied_department_patch"):
+        lines.append(f"Copied Department Patch: {department.get('copied_department_patch', '')}")
+    if department.get("department_patch_copy_error"):
+        lines.append(f"Department Patch Copy Error: {department.get('department_patch_copy_error', '')}")
     lines.append("")
 
     lines.append("CASE INFORMATION")
@@ -325,6 +375,7 @@ def save_notes_outputs(record: Dict[str, object], settings: Dict[str, object]) -
     base_filename = f"{safe_filename(case_number, 'NO_CASE')}_{safe_filename(source, 'notes')}_{timestamp}_notes"
 
     paths = ensure_directories(settings, case_number=case_number)
+    record = copy_department_patch(record, paths["attachments_dir"] / "branding")
     record = copy_supporting_files(record, paths["attachments_dir"])
     outputs = {}
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 APP_NAME = "ByteCase Notes"
 APP_SUBTITLE = "Examiner Notes Workspace"
-APP_VERSION = "0.4.0"
+APP_VERSION = "0.5.0"
 SUITE_NAME = "ByteCase"
 PUBLISHER_NAME = "Forensics Byte"
 PRODUCT_DOMAIN = "byte-case.com"
@@ -26,6 +26,9 @@ DEFAULT_SETTINGS = {
     "department_name": "",
     "unit_name": "",
     "default_examiner": "",
+    "branding": {
+        "department_patch_path": ""
+    },
     "examiners": [],
     "appearance": {"theme": "system"},
     "output_paths": {
@@ -100,6 +103,13 @@ def normalize_settings(settings):
             cat_clean.append(item)
             cat_seen.add(item.lower())
     settings["artifact_categories"] = cat_clean or DEFAULT_SETTINGS["artifact_categories"][:]
+
+    branding = settings.get("branding", {})
+    if not isinstance(branding, dict):
+        branding = {}
+    settings["branding"] = {
+        "department_patch_path": str(branding.get("department_patch_path", "")).strip()
+    }
 
     report_defaults = settings.get("report_defaults", {})
     if not isinstance(report_defaults, dict):

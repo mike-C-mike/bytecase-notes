@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Inches, Pt
 
 
@@ -20,6 +21,26 @@ def set_document_defaults(document):
         style = document.styles[style_name]
         style.font.name = "Arial"
         style.font.bold = True
+
+
+def add_department_patch(document, department):
+    """Add the configured department patch/logo to the DOCX header area when available."""
+    patch_path = department.get("copied_department_patch") or department.get("department_patch_path")
+    if not patch_path:
+        return
+
+    path = Path(patch_path)
+    if not path.exists() or not path.is_file():
+        document.add_paragraph(f"Department patch/logo not embedded: file not found ({patch_path})")
+        return
+
+    try:
+        paragraph = document.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = paragraph.add_run()
+        run.add_picture(str(path), width=Inches(0.85))
+    except Exception as exc:
+        document.add_paragraph(f"Department patch/logo not embedded: {exc}")
 
 
 def add_key_value_table(document, rows):
@@ -58,10 +79,15 @@ def save_docx_notes(record, docx_path):
     case_info = record.get("case_info", {})
     artifacts = record.get("artifacts", [])
 
+    add_department_patch(document, department)
+
     document.add_heading("Department", level=1)
     add_key_value_table(document, [
         ("Department / Agency", department.get("department_name", "")),
         ("Unit", department.get("unit_name", "")),
+        ("Department Patch / Logo", department.get("department_patch_path", "")),
+        ("Copied Department Patch", department.get("copied_department_patch", "")),
+        ("Department Patch Copy Error", department.get("department_patch_copy_error", "")),
     ])
 
     document.add_heading("Case Information", level=1)

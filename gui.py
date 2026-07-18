@@ -746,21 +746,34 @@ class SettingsWindow:
         self.department_name_var = tk.StringVar()
         self.unit_name_var = tk.StringVar()
         self.default_examiner_var = tk.StringVar()
+        self.department_patch_path_var = tk.StringVar()
         ttk.Label(frame, text="Theme").grid(row=0, column=0, sticky="w", pady=5)
         ttk.Combobox(frame, textvariable=self.theme_var, values=["system", "dark", "light"], state="readonly").grid(row=0, column=1, sticky="ew", pady=5)
         ttk.Label(frame, text="Department / Agency").grid(row=1, column=0, sticky="w", pady=5)
         ttk.Entry(frame, textvariable=self.department_name_var).grid(row=1, column=1, sticky="ew", pady=5)
         ttk.Label(frame, text="Unit").grid(row=2, column=0, sticky="w", pady=5)
         ttk.Entry(frame, textvariable=self.unit_name_var).grid(row=2, column=1, sticky="ew", pady=5)
-        ttk.Label(frame, text="Default Examiner").grid(row=3, column=0, sticky="w", pady=5)
-        ttk.Entry(frame, textvariable=self.default_examiner_var).grid(row=3, column=1, sticky="ew", pady=5)
-        ttk.Label(frame, text="Examiner List\n(one per line)").grid(row=4, column=0, sticky="nw", pady=5)
-        self.examiners_text = tk.Text(frame, height=8)
-        self.examiners_text.grid(row=4, column=1, sticky="ew", pady=5)
+        ttk.Label(frame, text="Department Patch / Logo").grid(row=3, column=0, sticky="w", pady=5)
+        ttk.Entry(frame, textvariable=self.department_patch_path_var).grid(row=3, column=1, sticky="ew", pady=5)
+        patch_buttons = ttk.Frame(frame)
+        patch_buttons.grid(row=3, column=2, sticky="e", padx=(4, 0), pady=5)
+        ttk.Button(patch_buttons, text="Browse", command=self.browse_department_patch).pack(side="left", padx=2)
+        ttk.Button(patch_buttons, text="Clear", command=lambda: self.department_patch_path_var.set("")).pack(side="left", padx=2)
+        ttk.Label(
+            frame,
+            text="Optional. Select a department patch/logo image to embed in DOCX reports and copy into each exported notes packet.",
+            wraplength=620,
+            style="Muted.TLabel",
+        ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(0, 8))
+        ttk.Label(frame, text="Default Examiner").grid(row=5, column=0, sticky="w", pady=5)
+        ttk.Entry(frame, textvariable=self.default_examiner_var).grid(row=5, column=1, sticky="ew", pady=5)
+        ttk.Label(frame, text="Examiner List\n(one per line)").grid(row=6, column=0, sticky="nw", pady=5)
+        self.examiners_text = tk.Text(frame, height=7)
+        self.examiners_text.grid(row=6, column=1, columnspan=2, sticky="ew", pady=5)
         style_text_widget(self.examiners_text, self.app.colors)
-        ttk.Label(frame, text="Artifact Categories\n(one per line)").grid(row=5, column=0, sticky="nw", pady=5)
-        self.categories_text = tk.Text(frame, height=8)
-        self.categories_text.grid(row=5, column=1, sticky="ew", pady=5)
+        ttk.Label(frame, text="Artifact Categories\n(one per line)").grid(row=7, column=0, sticky="nw", pady=5)
+        self.categories_text = tk.Text(frame, height=7)
+        self.categories_text.grid(row=7, column=1, columnspan=2, sticky="ew", pady=5)
         style_text_widget(self.categories_text, self.app.colors)
 
     def build_output_tab(self, notebook):
@@ -793,6 +806,7 @@ class SettingsWindow:
         self.theme_var.set(self.settings.get("appearance", {}).get("theme", "system"))
         self.department_name_var.set(self.settings.get("department_name", ""))
         self.unit_name_var.set(self.settings.get("unit_name", ""))
+        self.department_patch_path_var.set(self.settings.get("branding", {}).get("department_patch_path", ""))
         self.default_examiner_var.set(self.settings.get("default_examiner", ""))
         self.examiners_text.insert("1.0", "\n".join(self.settings.get("examiners", [])))
         self.categories_text.insert("1.0", "\n".join(self.settings.get("artifact_categories", [])))
@@ -804,6 +818,17 @@ class SettingsWindow:
         defaults = self.settings.get("report_defaults", {})
         self.export_txt_var.set(bool(defaults.get("export_txt", True)))
         self.export_docx_var.set(bool(defaults.get("export_docx", True)))
+
+    def browse_department_patch(self):
+        path = filedialog.askopenfilename(
+            title="Select Department Patch or Logo Image",
+            filetypes=[
+                ("Image Files", "*.png *.jpg *.jpeg *.bmp *.gif *.tif *.tiff"),
+                ("All Files", "*.*"),
+            ],
+        )
+        if path:
+            self.department_patch_path_var.set(path)
 
     def browse_output_root(self):
         folder = filedialog.askdirectory(title="Select ByteCase Output Root")
@@ -825,6 +850,9 @@ class SettingsWindow:
         self.settings["department_name"] = self.department_name_var.get().strip()
         self.settings["unit_name"] = self.unit_name_var.get().strip()
         self.settings["default_examiner"] = self.default_examiner_var.get().strip()
+        self.settings["branding"] = {
+            "department_patch_path": self.department_patch_path_var.get().strip()
+        }
         self.settings["examiners"] = self.get_lines(self.examiners_text)
         self.settings["artifact_categories"] = self.get_lines(self.categories_text)
         self.settings["output_paths"] = {

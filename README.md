@@ -7,7 +7,7 @@ It is part of the **ByteCase** toolset by **Forensics Byte**.
 ## Version
 
 ```text
-v0.4.0 - Reference helper and note block workflow
+v0.5.0 - Department patch / logo upload support
 ```
 
 ## What this tool does
@@ -31,6 +31,7 @@ ByteCase Notes helps an examiner:
 - Copy selected artifact references to the clipboard.
 - Open a selected artifact's supporting file from the artifact index.
 - Export optional TXT and DOCX reports.
+- Save a department patch/logo image in Settings for DOCX branding and case packet capture.
 
 ## What this tool does not do
 
@@ -56,8 +57,9 @@ It is a documentation and workflow companion.
 5. Use Insert Note Block when a simple structure helps.
 6. Use Check Refs to compare narrative references against the artifact index.
 7. Add optional supporting files/screenshots to artifact references.
-8. Review and export.
-9. Reopen the saved JSON later when the notes need to continue.
+8. Optional: add a department patch/logo in Settings for branded DOCX exports.
+9. Review and export.
+10. Reopen the saved JSON later when the notes need to continue.
 ```
 
 ## Reference check
@@ -98,6 +100,19 @@ Current blocks:
 
 These blocks are only writing aids. The examiner should edit or delete any fields that do not apply.
 
+
+## Department patch / logo
+
+Settings includes an optional **Department Patch / Logo** image path. Use **Browse** to select a local image file such as a PNG or JPG department patch.
+
+When notes are exported, ByteCase Notes:
+
+- Stores the original image path in JSON/TXT/DOCX metadata.
+- Copies the image into the case notes packet under `attachments\branding\`.
+- Embeds the copied image near the top of the DOCX report when available.
+
+Supported image extensions are `.png`, `.jpg`, `.jpeg`, `.bmp`, `.gif`, `.tif`, and `.tiff`. For best results, use a clear PNG or JPG patch/logo image.
+
 ## Output structure
 
 Default output root:
@@ -117,7 +132,7 @@ ByteCase\
       attachments\
 ```
 
-JSON is always exported. TXT and DOCX follow Settings defaults. Supporting files listed on artifact records are copied into `attachments` during export when the source file is available.
+JSON is always exported. TXT and DOCX follow Settings defaults. Supporting files listed on artifact records are copied into `attachments` during export when the source file is available. Department patch/logo images are copied into `attachments\branding` during export when configured and available.
 
 ## Dependency notes
 
