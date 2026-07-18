@@ -1,19 +1,15 @@
 {
-  "department_name": "Example Police Department",
-  "unit_name": "Digital Evidence Unit",
-  "default_examiner": "Example Examiner",
-  "examiners": [
-    "Example Examiner",
-    "Second Example Examiner"
-  ],
+  "department_name": "",
+  "unit_name": "",
+  "default_examiner": "",
+  "examiners": [],
   "appearance": {
-    "theme": "system"
+    "theme": "light"
   },
   "output_paths": {
     "base_output_dir": "",
     "reports_folder_name": "reports",
-    "saved_notes_folder_name": "saved_notes",
-    "attachments_folder_name": "attachments"
+    "saved_notes_folder_name": "saved_notes"
   },
   "report_defaults": {
     "export_txt": true,

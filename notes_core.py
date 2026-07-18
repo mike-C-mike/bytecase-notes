@@ -1,11 +1,86 @@
 """Core record building and exports for ByteCase Notes."""
+import copy
 import json
+import re
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 from docx_exporter import save_docx_notes
 from settings_service import APP_NAME, APP_VERSION, ensure_directories, safe_filename
+
+ARTIFACT_REF_PATTERN = re.compile(r"\[\s*(ART-\d{3,})\s*\]", re.IGNORECASE)
+
+
+def extract_artifact_references(text: str) -> List[str]:
+    """Return unique artifact references found in narrative notes, preserving first-seen order."""
+    refs = []
+    seen = set()
+    for match in ARTIFACT_REF_PATTERN.findall(text or ""):
+        ref = match.upper().strip()
+        if ref not in seen:
+            refs.append(ref)
+            seen.add(ref)
+    return refs
+
+
+def build_reference_audit(narrative_notes: str, artifacts: List[Dict[str, str]]) -> Dict[str, object]:
+    """Compare [ART-###] references in notes against the structured artifact index."""
+    referenced_ids = extract_artifact_references(narrative_notes)
+    artifact_ids = []
+    seen_artifacts = set()
+    duplicate_artifact_ids = []
+
+    for artifact in artifacts or []:
+        artifact_id = str(artifact.get("artifact_id", "")).strip().upper()
+        if not artifact_id:
+            continue
+        if artifact_id in seen_artifacts and artifact_id not in duplicate_artifact_ids:
+            duplicate_artifact_ids.append(artifact_id)
+        if artifact_id not in seen_artifacts:
+            artifact_ids.append(artifact_id)
+            seen_artifacts.add(artifact_id)
+
+    missing_from_index = [ref for ref in referenced_ids if ref not in seen_artifacts]
+    not_referenced_in_notes = [artifact_id for artifact_id in artifact_ids if artifact_id not in referenced_ids]
+
+    return {
+        "referenced_artifact_ids": referenced_ids,
+        "indexed_artifact_ids": artifact_ids,
+        "missing_from_artifact_index": missing_from_index,
+        "not_referenced_in_notes": not_referenced_in_notes,
+        "duplicate_artifact_ids": duplicate_artifact_ids,
+        "reference_count": len(referenced_ids),
+        "artifact_count": len(artifact_ids),
+    }
+
+
+def build_reference_audit_text(audit: Dict[str, object]) -> str:
+    lines = []
+    lines.append("Referenced in notes: " + (", ".join(audit.get("referenced_artifact_ids", [])) or "None"))
+    lines.append("Indexed artifacts: " + (", ".join(audit.get("indexed_artifact_ids", [])) or "None"))
+
+    missing = audit.get("missing_from_artifact_index", [])
+    unused = audit.get("not_referenced_in_notes", [])
+    duplicates = audit.get("duplicate_artifact_ids", [])
+
+    if missing:
+        lines.append("References missing from artifact index: " + ", ".join(missing))
+    else:
+        lines.append("References missing from artifact index: None")
+
+    if unused:
+        lines.append("Indexed artifacts not referenced in notes: " + ", ".join(unused))
+    else:
+        lines.append("Indexed artifacts not referenced in notes: None")
+
+    if duplicates:
+        lines.append("Duplicate artifact IDs: " + ", ".join(duplicates))
+    else:
+        lines.append("Duplicate artifact IDs: None")
+
+    return "\n".join(lines)
 
 
 def next_artifact_id(artifacts: List[Dict[str, str]]) -> str:
@@ -17,6 +92,61 @@ def next_artifact_id(artifacts: List[Dict[str, str]]) -> str:
         except ValueError:
             continue
     return f"ART-{highest + 1:03d}"
+
+
+def load_notes_json(path: str) -> Dict[str, object]:
+    notes_path = Path(path)
+    with notes_path.open("r", encoding="utf-8") as f:
+        record = json.load(f)
+
+    if not isinstance(record, dict):
+        raise ValueError("Notes JSON did not contain an object.")
+
+    case_info = record.get("case_info")
+    if not isinstance(case_info, dict):
+        raise ValueError("Notes JSON does not contain a valid case_info object.")
+
+    artifacts = record.get("artifacts", [])
+    if not isinstance(artifacts, list):
+        raise ValueError("Notes JSON does not contain a valid artifacts list.")
+
+    return record
+
+
+def copy_supporting_files(record: Dict[str, object], attachments_dir: Path) -> Dict[str, object]:
+    updated = copy.deepcopy(record)
+    attachments_dir.mkdir(parents=True, exist_ok=True)
+
+    for artifact in updated.get("artifacts", []):
+        original_path = str(artifact.get("supporting_file_path", "")).strip()
+
+        if not original_path:
+            continue
+
+        source_path = Path(original_path)
+
+        if not source_path.exists() or not source_path.is_file():
+            artifact["attachment_copy_error"] = "Supporting file path was not found or was not a file."
+            continue
+
+        artifact_id = safe_filename(artifact.get("artifact_id", "ART"), "ART")
+        destination_name = f"{artifact_id}_{safe_filename(source_path.stem, 'supporting_file')}{source_path.suffix}"
+        destination_path = attachments_dir / destination_name
+
+        counter = 1
+        while destination_path.exists():
+            destination_name = f"{artifact_id}_{safe_filename(source_path.stem, 'supporting_file')}_{counter}{source_path.suffix}"
+            destination_path = attachments_dir / destination_name
+            counter += 1
+
+        try:
+            shutil.copy2(source_path, destination_path)
+            artifact["copied_supporting_file"] = str(destination_path)
+            artifact["supporting_file_name"] = destination_path.name
+        except OSError as exc:
+            artifact["attachment_copy_error"] = str(exc)
+
+    return updated
 
 
 def build_notes_record(
@@ -36,6 +166,7 @@ def build_notes_record(
         "app_version": APP_VERSION,
         "record_type": "Examiner notes workspace",
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "department": {
             "department_name": settings.get("department_name", ""),
             "unit_name": settings.get("unit_name", ""),
@@ -51,6 +182,7 @@ def build_notes_record(
         "narrative_notes": narrative_notes.strip(),
         "artifacts": artifacts,
         "limitations": limitations.strip(),
+        "reference_audit": build_reference_audit(narrative_notes, artifacts),
         "boundary_notice": (
             "ByteCase Notes helps examiners document observations and artifact references. "
             "It does not parse evidence, determine evidentiary relevance, infer user intent, "
@@ -98,6 +230,11 @@ def build_txt_notes(record: Dict[str, object]) -> str:
             lines.append(f"  Source Item: {artifact.get('source_item', '')}")
             lines.append(f"  Tool / Source: {artifact.get('tool_source', '')}")
             lines.append(f"  Artifact Location: {artifact.get('artifact_location', '')}")
+            lines.append(f"  Supporting File: {artifact.get('supporting_file_path', '')}")
+            if artifact.get("copied_supporting_file"):
+                lines.append(f"  Copied Supporting File: {artifact.get('copied_supporting_file', '')}")
+            if artifact.get("attachment_copy_error"):
+                lines.append(f"  Supporting File Copy Error: {artifact.get('attachment_copy_error', '')}")
             lines.append(f"  Date / Time: {artifact.get('date_time', '')}")
             lines.append(f"  Summary: {artifact.get('summary', '')}")
             lines.append(f"  Notes: {artifact.get('notes', '')}")
@@ -105,6 +242,12 @@ def build_txt_notes(record: Dict[str, object]) -> str:
     else:
         lines.append("No artifact references were added.")
         lines.append("")
+
+    lines.append("REFERENCE CHECK")
+    lines.append("-" * 80)
+    audit = record.get("reference_audit") or build_reference_audit(record.get("narrative_notes", ""), artifacts)
+    lines.append(build_reference_audit_text(audit))
+    lines.append("")
 
     limitations = record.get("limitations", "")
     if limitations:
@@ -130,6 +273,7 @@ def save_notes_outputs(record: Dict[str, object], settings: Dict[str, object]) -
     base_filename = f"{safe_filename(case_number, 'NO_CASE')}_{safe_filename(source, 'notes')}_{timestamp}_notes"
 
     paths = ensure_directories(settings, case_number=case_number)
+    record = copy_supporting_files(record, paths["attachments_dir"])
     outputs = {}
 
     json_path = paths["saved_notes_dir"] / f"{base_filename}.json"

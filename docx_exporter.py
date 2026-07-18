@@ -5,6 +5,7 @@ from docx import Document
 from docx.shared import Inches, Pt
 
 
+
 def set_document_defaults(document):
     section = document.sections[0]
     section.top_margin = Inches(0.7)
@@ -29,6 +30,19 @@ def add_key_value_table(document, rows):
         cells[0].text = str(label)
         cells[1].text = str(value)
     document.add_paragraph()
+
+
+def add_reference_audit_section(document, record, artifacts):
+    audit = record.get("reference_audit", {})
+    document.add_heading("Reference Check", level=1)
+    rows = [
+        ("Referenced in Notes", ", ".join(audit.get("referenced_artifact_ids", [])) or "None"),
+        ("Indexed Artifacts", ", ".join(audit.get("indexed_artifact_ids", [])) or "None"),
+        ("References Missing from Artifact Index", ", ".join(audit.get("missing_from_artifact_index", [])) or "None"),
+        ("Indexed Artifacts Not Referenced in Notes", ", ".join(audit.get("not_referenced_in_notes", [])) or "None"),
+        ("Duplicate Artifact IDs", ", ".join(audit.get("duplicate_artifact_ids", [])) or "None"),
+    ]
+    add_key_value_table(document, rows)
 
 
 def save_docx_notes(record, docx_path):
@@ -87,11 +101,16 @@ def save_docx_notes(record, docx_path):
             document.add_heading(f"{artifact.get('artifact_id', '')}: {artifact.get('title', '')}", level=2)
             add_key_value_table(document, [
                 ("Date / Time", artifact.get("date_time", "")),
+                ("Supporting File", artifact.get("supporting_file_path", "")),
+                ("Copied Supporting File", artifact.get("copied_supporting_file", "")),
+                ("Supporting File Copy Error", artifact.get("attachment_copy_error", "")),
                 ("Summary", artifact.get("summary", "")),
                 ("Notes", artifact.get("notes", "")),
             ])
     else:
         document.add_paragraph("No artifact references were added.")
+
+    add_reference_audit_section(document, record, artifacts)
 
     limitations = record.get("limitations", "")
     if limitations:

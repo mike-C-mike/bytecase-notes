@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from bytecase_theme import apply_theme, configure_toplevel, get_current_theme, style_text_widget
-from notes_core import build_notes_record, next_artifact_id, save_notes_outputs
+from notes_core import build_notes_record, build_reference_audit_text, load_notes_json, next_artifact_id, save_notes_outputs
 from settings_service import (
     APP_NAME,
     APP_SUBTITLE,
@@ -86,9 +86,11 @@ class ByteCaseNotesApp:
         header.columnconfigure(0, weight=1)
         ttk.Label(header, text=f"{APP_NAME} v{APP_VERSION}", style="Title.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(header, text=f"{APP_SUBTITLE} · {PUBLISHER_NAME} · {PRODUCT_DOMAIN}", style="Muted.TLabel").grid(row=1, column=0, sticky="w")
-        ttk.Button(header, text="Settings", command=self.open_settings_window).grid(row=0, column=1, rowspan=2, padx=4)
-        ttk.Button(header, text="About", command=self.open_about).grid(row=0, column=2, rowspan=2, padx=4)
-        ttk.Button(header, text="Open Output", command=self.open_output_folder).grid(row=0, column=3, rowspan=2, padx=4)
+        ttk.Button(header, text="New", command=self.clear_workspace).grid(row=0, column=1, rowspan=2, padx=4)
+        ttk.Button(header, text="Open Notes JSON", command=self.load_notes_workspace).grid(row=0, column=2, rowspan=2, padx=4)
+        ttk.Button(header, text="Settings", command=self.open_settings_window).grid(row=0, column=3, rowspan=2, padx=4)
+        ttk.Button(header, text="About", command=self.open_about).grid(row=0, column=4, rowspan=2, padx=4)
+        ttk.Button(header, text="Open Output", command=self.open_output_folder).grid(row=0, column=5, rowspan=2, padx=4)
 
         self.notebook = ttk.Notebook(self.root)
         self.notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
@@ -145,6 +147,7 @@ class ByteCaseNotesApp:
         button_row.grid(row=1, column=0, sticky="ew", pady=(8, 8))
         ttk.Button(button_row, text="Insert Selected Artifact Reference", command=self.insert_selected_artifact_reference).pack(side="left", padx=4)
         ttk.Button(button_row, text="Add Artifact", command=self.open_artifact_window).pack(side="left", padx=4)
+        ttk.Button(button_row, text="Check Refs", command=self.check_artifact_references).pack(side="left", padx=4)
         ttk.Button(button_row, text="Next: Artifacts", style="Accent.TButton", command=lambda: self.notebook.select(2)).pack(side="right", padx=4)
 
         text_frame = ttk.Frame(frame)
@@ -166,7 +169,7 @@ class ByteCaseNotesApp:
         ttk.Label(frame, text="3. Artifact index", style="Title.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(frame, text="Add manually identified artifacts, screenshots, exports, or observations. Then reference them in notes as [ART-###].", style="Muted.TLabel").grid(row=1, column=0, sticky="w", pady=(0, 8))
 
-        columns = ("artifact_id", "title", "category", "source_item", "tool_source", "location")
+        columns = ("artifact_id", "title", "category", "source_item", "tool_source", "location", "supporting_file")
         self.artifact_tree = ttk.Treeview(frame, columns=columns, show="headings", height=16)
         headings = {
             "artifact_id": "ID",
@@ -175,8 +178,9 @@ class ByteCaseNotesApp:
             "source_item": "Source Item",
             "tool_source": "Tool / Source",
             "location": "Location",
+            "supporting_file": "Supporting File",
         }
-        widths = {"artifact_id": 80, "title": 220, "category": 140, "source_item": 160, "tool_source": 160, "location": 360}
+        widths = {"artifact_id": 80, "title": 220, "category": 140, "source_item": 160, "tool_source": 160, "location": 300, "supporting_file": 260}
         for column in columns:
             self.artifact_tree.heading(column, text=headings[column])
             self.artifact_tree.column(column, width=widths[column], anchor="w")
@@ -192,7 +196,9 @@ class ByteCaseNotesApp:
         ttk.Button(buttons, text="Add Artifact", command=self.open_artifact_window).pack(side="left", padx=4)
         ttk.Button(buttons, text="Edit Selected", command=self.edit_selected_artifact).pack(side="left", padx=4)
         ttk.Button(buttons, text="Remove Selected", command=self.remove_selected_artifact).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Copy Ref", command=self.copy_selected_artifact_reference).pack(side="left", padx=4)
         ttk.Button(buttons, text="Insert Reference in Notes", command=self.insert_selected_artifact_reference).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Open Supporting File", command=self.open_selected_supporting_file).pack(side="left", padx=4)
         ttk.Button(buttons, text="Next: Export", style="Accent.TButton", command=lambda: self.notebook.select(3)).pack(side="right", padx=4)
 
     def build_export_tab(self):
@@ -216,6 +222,7 @@ class ByteCaseNotesApp:
         buttons = ttk.Frame(body)
         buttons.grid(row=5, column=0, sticky="ew", pady=12)
         ttk.Button(buttons, text="Review Summary", command=self.review_summary).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Check Refs", command=self.check_artifact_references).pack(side="left", padx=4)
         ttk.Button(buttons, text="Export Notes", style="Accent.TButton", command=self.export_notes).pack(side="left", padx=4)
         ttk.Button(buttons, text="Save + Open Folder", command=self.export_and_open).pack(side="left", padx=4)
         ttk.Button(buttons, text="Open Last Folder", command=self.open_last_folder).pack(side="right", padx=4)
@@ -261,7 +268,60 @@ class ByteCaseNotesApp:
                 artifact.get("source_item", ""),
                 artifact.get("tool_source", ""),
                 artifact.get("artifact_location", ""),
+                artifact.get("supporting_file_path", ""),
             ))
+
+    def clear_workspace(self):
+        confirm = messagebox.askyesno("New Notes Workspace", "Clear the current notes workspace and start a new one?")
+        if not confirm:
+            return
+        self.case_number_var.set("")
+        self.agency_case_number_var.set("")
+        self.examiner_var.set(self.settings.get("default_examiner", ""))
+        self.reviewed_by_var.set("")
+        self.source_description_var.set("")
+        self.phase_var.set("Analysis")
+        self.notes_text.delete("1.0", "end")
+        self.limitations_text.delete("1.0", "end")
+        self.artifacts = []
+        self.refresh_artifact_tree()
+        self.summary_var.set("New notes workspace started.")
+        self.notebook.select(0)
+
+    def load_notes_workspace(self):
+        path = filedialog.askopenfilename(
+            title="Open ByteCase Notes JSON",
+            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            record = load_notes_json(path)
+        except Exception as exc:
+            messagebox.showerror("Open Notes Error", f"Could not open notes JSON.\n\nDetails:\n{exc}")
+            return
+        self.populate_from_record(record)
+        self.summary_var.set(f"Loaded notes workspace from:\n{path}")
+        self.notebook.select(1)
+
+    def populate_from_record(self, record):
+        case_info = record.get("case_info", {})
+        self.case_number_var.set(case_info.get("case_number", ""))
+        self.agency_case_number_var.set(case_info.get("agency_case_number", ""))
+        self.examiner_var.set(case_info.get("examiner", ""))
+        self.reviewed_by_var.set(case_info.get("reviewed_by", ""))
+        self.source_description_var.set(case_info.get("source_description", ""))
+        self.phase_var.set(case_info.get("examination_phase", "Analysis") or "Analysis")
+
+        self.notes_text.delete("1.0", "end")
+        self.notes_text.insert("1.0", record.get("narrative_notes", ""))
+
+        self.limitations_text.delete("1.0", "end")
+        self.limitations_text.insert("1.0", record.get("limitations", ""))
+
+        artifacts = record.get("artifacts", [])
+        self.artifacts = artifacts if isinstance(artifacts, list) else []
+        self.refresh_artifact_tree()
 
     def open_artifact_window(self, artifact=None):
         ArtifactWindow(self, artifact=artifact)
@@ -310,6 +370,47 @@ class ByteCaseNotesApp:
         self.notebook.select(1)
         self.notes_text.focus_set()
 
+    def copy_selected_artifact_reference(self):
+        selected = self.artifact_tree.selection()
+        if not selected:
+            messagebox.showinfo("Copy Artifact Reference", "Select an artifact first.")
+            return
+        ref = f"[{selected[0]}]"
+        self.root.clipboard_clear()
+        self.root.clipboard_append(ref)
+        self.summary_var.set(f"Copied artifact reference: {ref}")
+
+    def get_selected_artifact(self):
+        selected = self.artifact_tree.selection()
+        if not selected:
+            return None
+        artifact_id = selected[0]
+        return next((item for item in self.artifacts if item.get("artifact_id") == artifact_id), None)
+
+    def open_selected_supporting_file(self):
+        artifact = self.get_selected_artifact()
+        if not artifact:
+            messagebox.showinfo("Open Supporting File", "Select an artifact first.")
+            return
+        path = artifact.get("supporting_file_path") or artifact.get("copied_supporting_file")
+        if not path:
+            messagebox.showinfo("Open Supporting File", "The selected artifact does not have a supporting file path.")
+            return
+        if not os.path.exists(path):
+            messagebox.showerror("Open Supporting File", f"The supporting file was not found:\n\n{path}")
+            return
+        try:
+            os.startfile(path)
+        except OSError as exc:
+            messagebox.showerror("Open Supporting File", str(exc))
+
+    def check_artifact_references(self):
+        record = self.build_record()
+        audit = record.get("reference_audit", {})
+        audit_text = build_reference_audit_text(audit)
+        self.summary_var.set(audit_text)
+        messagebox.showinfo("Artifact Reference Check", audit_text)
+
     def review_summary(self):
         record = self.build_record()
         errors, warnings = validate_notes_record(record)
@@ -321,6 +422,11 @@ class ByteCaseNotesApp:
             f"Narrative characters: {note_chars}",
             f"Artifacts indexed: {artifact_count}",
         ]
+        audit = record.get("reference_audit", {})
+        if audit.get("missing_from_artifact_index"):
+            summary.append("Missing artifact index entries: " + ", ".join(audit.get("missing_from_artifact_index", [])))
+        if audit.get("not_referenced_in_notes"):
+            summary.append("Indexed but not referenced in notes: " + ", ".join(audit.get("not_referenced_in_notes", [])))
         if warnings:
             summary.append("Warnings: " + "; ".join(warnings))
         if errors:
@@ -395,7 +501,7 @@ class ArtifactWindow:
         self.artifact = artifact or {}
         self.window = tk.Toplevel(app.root)
         self.window.title("Artifact Reference")
-        self.window.geometry("780x680")
+        self.window.geometry("820x740")
         self.window.transient(app.root)
         self.window.grab_set()
         configure_toplevel(self.window, app.colors)
@@ -404,13 +510,14 @@ class ArtifactWindow:
 
     def build_window(self):
         self.window.columnconfigure(1, weight=1)
-        self.window.rowconfigure(8, weight=1)
+        self.window.rowconfigure(9, weight=1)
         self.artifact_id_var = tk.StringVar(value=next_artifact_id(self.app.artifacts))
         self.title_var = tk.StringVar()
         self.category_var = tk.StringVar()
         self.source_item_var = tk.StringVar()
         self.tool_source_var = tk.StringVar()
         self.location_var = tk.StringVar()
+        self.supporting_file_path_var = tk.StringVar()
         self.date_time_var = tk.StringVar()
 
         fields = [
@@ -420,27 +527,31 @@ class ArtifactWindow:
             ("Source Item", self.source_item_var, 3),
             ("Tool / Source", self.tool_source_var, 4),
             ("Artifact Location", self.location_var, 5),
-            ("Date / Time", self.date_time_var, 6),
+            ("Supporting File / Screenshot", self.supporting_file_path_var, 6),
+            ("Date / Time", self.date_time_var, 7),
         ]
         for label, var, row in fields:
             ttk.Label(self.window, text=label).grid(row=row, column=0, sticky="w", padx=10, pady=5)
             if label == "Category":
                 ttk.Combobox(self.window, textvariable=var, values=self.app.settings.get("artifact_categories", []), state="normal").grid(row=row, column=1, sticky="ew", padx=10, pady=5)
+            elif label == "Supporting File / Screenshot":
+                ttk.Entry(self.window, textvariable=var).grid(row=row, column=1, sticky="ew", padx=10, pady=5)
+                ttk.Button(self.window, text="Browse", command=self.browse_supporting_file).grid(row=row, column=2, sticky="e", padx=(0, 10), pady=5)
             else:
                 ttk.Entry(self.window, textvariable=var).grid(row=row, column=1, sticky="ew", padx=10, pady=5)
 
-        ttk.Label(self.window, text="Summary").grid(row=7, column=0, sticky="nw", padx=10, pady=5)
+        ttk.Label(self.window, text="Summary").grid(row=8, column=0, sticky="nw", padx=10, pady=5)
         self.summary_text = tk.Text(self.window, height=5)
-        self.summary_text.grid(row=7, column=1, sticky="ew", padx=10, pady=5)
+        self.summary_text.grid(row=8, column=1, sticky="ew", padx=10, pady=5)
         style_text_widget(self.summary_text, self.app.colors)
 
-        ttk.Label(self.window, text="Notes").grid(row=8, column=0, sticky="nw", padx=10, pady=5)
+        ttk.Label(self.window, text="Notes").grid(row=9, column=0, sticky="nw", padx=10, pady=5)
         self.notes_text = tk.Text(self.window, height=8)
-        self.notes_text.grid(row=8, column=1, sticky="nsew", padx=10, pady=5)
+        self.notes_text.grid(row=9, column=1, sticky="nsew", padx=10, pady=5)
         style_text_widget(self.notes_text, self.app.colors)
 
         buttons = ttk.Frame(self.window, padding=10)
-        buttons.grid(row=9, column=0, columnspan=2, sticky="e")
+        buttons.grid(row=10, column=0, columnspan=2, sticky="e")
         ttk.Button(buttons, text="Cancel", command=self.window.destroy).pack(side="right", padx=4)
         ttk.Button(buttons, text="Save Artifact", style="Accent.TButton", command=self.save).pack(side="right", padx=4)
 
@@ -453,9 +564,18 @@ class ArtifactWindow:
         self.source_item_var.set(self.artifact.get("source_item", ""))
         self.tool_source_var.set(self.artifact.get("tool_source", ""))
         self.location_var.set(self.artifact.get("artifact_location", ""))
+        self.supporting_file_path_var.set(self.artifact.get("supporting_file_path", ""))
         self.date_time_var.set(self.artifact.get("date_time", ""))
         self.summary_text.insert("1.0", self.artifact.get("summary", ""))
         self.notes_text.insert("1.0", self.artifact.get("notes", ""))
+
+    def browse_supporting_file(self):
+        path = filedialog.askopenfilename(
+            title="Select Supporting File or Screenshot",
+            filetypes=[("All Files", "*.*")],
+        )
+        if path:
+            self.supporting_file_path_var.set(path)
 
     def save(self):
         artifact_id = self.artifact_id_var.get().strip()
@@ -469,6 +589,7 @@ class ArtifactWindow:
             "source_item": self.source_item_var.get().strip(),
             "tool_source": self.tool_source_var.get().strip(),
             "artifact_location": self.location_var.get().strip(),
+            "supporting_file_path": self.supporting_file_path_var.get().strip(),
             "date_time": self.date_time_var.get().strip(),
             "summary": self.summary_text.get("1.0", "end").strip(),
             "notes": self.notes_text.get("1.0", "end").strip(),
@@ -534,6 +655,7 @@ class SettingsWindow:
         self.output_root_var = tk.StringVar()
         self.reports_folder_var = tk.StringVar()
         self.saved_notes_folder_var = tk.StringVar()
+        self.attachments_folder_var = tk.StringVar()
         self.export_txt_var = tk.BooleanVar(value=True)
         self.export_docx_var = tk.BooleanVar(value=True)
         ttk.Label(frame, text="ByteCase Output Root").grid(row=0, column=0, sticky="w", pady=5)
@@ -546,9 +668,11 @@ class SettingsWindow:
         ttk.Entry(frame, textvariable=self.reports_folder_var).grid(row=2, column=1, sticky="ew", pady=5)
         ttk.Label(frame, text="Saved Notes Folder Name").grid(row=3, column=0, sticky="w", pady=5)
         ttk.Entry(frame, textvariable=self.saved_notes_folder_var).grid(row=3, column=1, sticky="ew", pady=5)
-        ttk.Checkbutton(frame, text="Export TXT reports by default", variable=self.export_txt_var).grid(row=4, column=0, columnspan=3, sticky="w", pady=8)
-        ttk.Checkbutton(frame, text="Export DOCX reports by default", variable=self.export_docx_var).grid(row=5, column=0, columnspan=3, sticky="w", pady=8)
-        ttk.Label(frame, text="JSON is always exported for continuity and later loading.", style="Muted.TLabel").grid(row=6, column=0, columnspan=4, sticky="w", pady=8)
+        ttk.Label(frame, text="Attachments Folder Name").grid(row=4, column=0, sticky="w", pady=5)
+        ttk.Entry(frame, textvariable=self.attachments_folder_var).grid(row=4, column=1, sticky="ew", pady=5)
+        ttk.Checkbutton(frame, text="Export TXT reports by default", variable=self.export_txt_var).grid(row=5, column=0, columnspan=3, sticky="w", pady=8)
+        ttk.Checkbutton(frame, text="Export DOCX reports by default", variable=self.export_docx_var).grid(row=6, column=0, columnspan=3, sticky="w", pady=8)
+        ttk.Label(frame, text="JSON is always exported for continuity and later loading.", style="Muted.TLabel").grid(row=7, column=0, columnspan=4, sticky="w", pady=8)
 
     def load_values(self):
         self.theme_var.set(self.settings.get("appearance", {}).get("theme", "system"))
@@ -561,6 +685,7 @@ class SettingsWindow:
         self.output_root_var.set(output_paths.get("base_output_dir", ""))
         self.reports_folder_var.set(output_paths.get("reports_folder_name", "reports"))
         self.saved_notes_folder_var.set(output_paths.get("saved_notes_folder_name", "saved_notes"))
+        self.attachments_folder_var.set(output_paths.get("attachments_folder_name", "attachments"))
         defaults = self.settings.get("report_defaults", {})
         self.export_txt_var.set(bool(defaults.get("export_txt", True)))
         self.export_docx_var.set(bool(defaults.get("export_docx", True)))
@@ -591,6 +716,7 @@ class SettingsWindow:
             "base_output_dir": self.output_root_var.get().strip(),
             "reports_folder_name": self.reports_folder_var.get().strip() or "reports",
             "saved_notes_folder_name": self.saved_notes_folder_var.get().strip() or "saved_notes",
+            "attachments_folder_name": self.attachments_folder_var.get().strip() or "attachments",
         }
         self.settings["report_defaults"] = {
             "export_txt": self.export_txt_var.get(),

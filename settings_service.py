@@ -5,7 +5,7 @@ from pathlib import Path
 
 APP_NAME = "ByteCase Notes"
 APP_SUBTITLE = "Examiner Notes Workspace"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.3.0"
 SUITE_NAME = "ByteCase"
 PUBLISHER_NAME = "Forensics Byte"
 PRODUCT_DOMAIN = "byte-case.com"
@@ -31,7 +31,8 @@ DEFAULT_SETTINGS = {
     "output_paths": {
         "base_output_dir": "",
         "reports_folder_name": "reports",
-        "saved_notes_folder_name": "saved_notes"
+        "saved_notes_folder_name": "saved_notes",
+        "attachments_folder_name": "attachments"
     },
     "report_defaults": {
         "export_txt": True,
@@ -147,6 +148,7 @@ def get_output_paths(settings, case_number=None):
     base_output_dir = str(output_settings.get("base_output_dir", "")).strip()
     reports_folder_name = str(output_settings.get("reports_folder_name", "reports")).strip() or "reports"
     saved_notes_folder_name = str(output_settings.get("saved_notes_folder_name", "saved_notes")).strip() or "saved_notes"
+    attachments_folder_name = str(output_settings.get("attachments_folder_name", "attachments")).strip() or "attachments"
 
     root_path = Path(base_output_dir) if base_output_dir else get_default_root()
     if case_number:
@@ -159,6 +161,7 @@ def get_output_paths(settings, case_number=None):
         "base_path": base_path,
         "reports_dir": base_path / reports_folder_name,
         "saved_notes_dir": base_path / saved_notes_folder_name,
+        "attachments_dir": base_path / attachments_folder_name,
     }
 
 
@@ -167,4 +170,5 @@ def ensure_directories(settings, case_number=None):
     paths["base_path"].mkdir(parents=True, exist_ok=True)
     paths["reports_dir"].mkdir(parents=True, exist_ok=True)
     paths["saved_notes_dir"].mkdir(parents=True, exist_ok=True)
+    paths["attachments_dir"].mkdir(parents=True, exist_ok=True)
     return paths
