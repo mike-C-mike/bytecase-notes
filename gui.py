@@ -1,5 +1,6 @@
 """GUI for ByteCase Notes."""
 import os
+from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -148,6 +149,8 @@ class ByteCaseNotesApp:
         ttk.Button(button_row, text="Insert Selected Artifact Reference", command=self.insert_selected_artifact_reference).pack(side="left", padx=4)
         ttk.Button(button_row, text="Add Artifact", command=self.open_artifact_window).pack(side="left", padx=4)
         ttk.Button(button_row, text="Check Refs", command=self.check_artifact_references).pack(side="left", padx=4)
+        ttk.Button(button_row, text="Ref Help", command=self.open_reference_help).pack(side="left", padx=4)
+        ttk.Button(button_row, text="Insert Note Block", command=self.open_note_block_window).pack(side="left", padx=4)
         ttk.Button(button_row, text="Next: Artifacts", style="Accent.TButton", command=lambda: self.notebook.select(2)).pack(side="right", padx=4)
 
         text_frame = ttk.Frame(frame)
@@ -411,6 +414,72 @@ class ByteCaseNotesApp:
         self.summary_var.set(audit_text)
         messagebox.showinfo("Artifact Reference Check", audit_text)
 
+    def open_reference_help(self):
+        messagebox.showinfo(
+            "Artifact Reference Help",
+            "Preferred reference format:\n"
+            "  [ART-001]\n\n"
+            "You may type references directly into notes. ByteCase Notes recognizes [ART-001] as the clean standard. "
+            "The reference checker also looks for common variants like ART-001 or art 001 so they are not missed.\n\n"
+            "Suggested workflow:\n"
+            "1. Add the artifact to the Artifact Index.\n"
+            "2. Reference it in narrative notes using [ART-001].\n"
+            "3. Click Check Refs before export.\n\n"
+            "Check Refs flags references that are missing from the artifact index, duplicate artifact IDs, indexed artifacts "
+            "not mentioned in notes, and references typed outside the preferred bracketed format."
+        )
+
+    def open_note_block_window(self):
+        NoteBlockWindow(self)
+
+    def insert_note_block(self, block_name):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        blocks = {
+            "Observation": (
+                f"\nObservation - {now}\n"
+                "Artifact reference: [ART-___]\n"
+                "Observed item / location:\n"
+                "Summary of observation:\n"
+                "Follow-up needed:\n"
+            ),
+            "Artifact Review": (
+                f"\nArtifact Review - {now}\n"
+                "Artifact reference: [ART-___]\n"
+                "Source item:\n"
+                "Tool / view used:\n"
+                "What was reviewed:\n"
+                "Notes:\n"
+            ),
+            "Follow-Up": (
+                f"\nFollow-Up - {now}\n"
+                "Related artifact/reference: [ART-___]\n"
+                "Question or issue:\n"
+                "Action taken / next step:\n"
+                "Status:\n"
+            ),
+            "Limitation": (
+                f"\nLimitation / Caveat - {now}\n"
+                "Related artifact/reference: [ART-___]\n"
+                "Limitation observed:\n"
+                "Impact on review/reporting:\n"
+                "How it was handled:\n"
+            ),
+            "Tool / Process Note": (
+                f"\nTool / Process Note - {now}\n"
+                "Tool / process used:\n"
+                "Version / settings if relevant:\n"
+                "Purpose:\n"
+                "Result / notes:\n"
+            ),
+            "Timestamp Note": f"\nTimestamp - {now}\nNotes:\n",
+        }
+        block = blocks.get(block_name)
+        if not block:
+            return
+        self.notes_text.insert("insert", block)
+        self.notebook.select(1)
+        self.notes_text.focus_set()
+
     def review_summary(self):
         record = self.build_record()
         errors, warnings = validate_notes_record(record)
@@ -493,6 +562,52 @@ class ByteCaseNotesApp:
         style_text_widget(self.notes_text, self.colors)
         style_text_widget(self.limitations_text, self.colors)
         self.load_defaults()
+
+
+class NoteBlockWindow:
+    def __init__(self, app):
+        self.app = app
+        self.window = tk.Toplevel(app.root)
+        self.window.title("Insert Note Block")
+        self.window.geometry("540x420")
+        self.window.transient(app.root)
+        self.window.grab_set()
+        configure_toplevel(self.window, app.colors)
+        self.build_window()
+
+    def build_window(self):
+        self.window.columnconfigure(0, weight=1)
+        ttk.Label(self.window, text="Insert Note Block", style="Title.TLabel").grid(row=0, column=0, sticky="w", padx=12, pady=(12, 4))
+        ttk.Label(
+            self.window,
+            text="Choose a simple note structure to insert at the current cursor position. Edit the inserted text as needed.",
+            wraplength=500,
+            style="Muted.TLabel",
+        ).grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 12))
+
+        button_frame = ttk.Frame(self.window, padding=(12, 4))
+        button_frame.grid(row=2, column=0, sticky="nsew")
+        button_frame.columnconfigure(0, weight=1)
+        note_blocks = [
+            "Observation",
+            "Artifact Review",
+            "Follow-Up",
+            "Limitation",
+            "Tool / Process Note",
+            "Timestamp Note",
+        ]
+        for row, block_name in enumerate(note_blocks):
+            ttk.Button(
+                button_frame,
+                text=block_name,
+                command=lambda name=block_name: self.insert_and_close(name),
+            ).grid(row=row, column=0, sticky="ew", pady=4)
+
+        ttk.Button(self.window, text="Cancel", command=self.window.destroy).grid(row=3, column=0, sticky="e", padx=12, pady=12)
+
+    def insert_and_close(self, block_name):
+        self.app.insert_note_block(block_name)
+        self.window.destroy()
 
 
 class ArtifactWindow:

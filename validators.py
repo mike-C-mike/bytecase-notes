@@ -19,4 +19,7 @@ def validate_notes_record(record):
         warnings.append("Notes reference artifact IDs that are not in the artifact index: " + ", ".join(missing))
     if duplicates:
         warnings.append("Duplicate artifact IDs exist in the artifact index: " + ", ".join(duplicates))
+    non_standard = audit.get("non_standard_references", []) if isinstance(audit, dict) else []
+    if non_standard:
+        warnings.append("Some artifact references were found outside the preferred [ART-001] format: " + "; ".join(non_standard))
     return errors, warnings

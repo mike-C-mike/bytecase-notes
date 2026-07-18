@@ -5,7 +5,7 @@ from pathlib import Path
 
 APP_NAME = "ByteCase Notes"
 APP_SUBTITLE = "Examiner Notes Workspace"
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 SUITE_NAME = "ByteCase"
 PUBLISHER_NAME = "Forensics Byte"
 PRODUCT_DOMAIN = "byte-case.com"

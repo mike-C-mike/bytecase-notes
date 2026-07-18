@@ -10,15 +10,46 @@ from typing import Dict, List, Tuple
 from docx_exporter import save_docx_notes
 from settings_service import APP_NAME, APP_VERSION, ensure_directories, safe_filename
 
-ARTIFACT_REF_PATTERN = re.compile(r"\[\s*(ART-\d{3,})\s*\]", re.IGNORECASE)
+ARTIFACT_REF_PATTERN = re.compile(
+    r"(?<![A-Z0-9])(?P<open>\[?)\s*ART\s*[- ]\s*(?P<number>\d{3,})\s*(?P<close>\]?)(?![A-Z0-9])",
+    re.IGNORECASE,
+)
+
+
+def normalize_artifact_reference(number: str) -> str:
+    """Return the standard ART-### form for a captured artifact reference number."""
+    return f"ART-{int(number):03d}"
+
+
+def extract_artifact_reference_matches(text: str) -> List[Dict[str, str]]:
+    """Return artifact reference matches with raw text and canonical IDs.
+
+    The preferred writing style is [ART-001], but the checker also recognizes
+    common variants such as ART-001, art-001, and ART 001 so handwritten notes
+    are not missed.
+    """
+    matches = []
+    for match in ARTIFACT_REF_PATTERN.finditer(text or ""):
+        number = match.group("number")
+        canonical = normalize_artifact_reference(number)
+        raw_text = match.group(0)
+        standard_text = f"[{canonical}]"
+        is_standard = raw_text.strip().upper() == standard_text
+        matches.append({
+            "artifact_id": canonical,
+            "raw_text": raw_text,
+            "standard_text": standard_text,
+            "is_standard": is_standard,
+        })
+    return matches
 
 
 def extract_artifact_references(text: str) -> List[str]:
     """Return unique artifact references found in narrative notes, preserving first-seen order."""
     refs = []
     seen = set()
-    for match in ARTIFACT_REF_PATTERN.findall(text or ""):
-        ref = match.upper().strip()
+    for match in extract_artifact_reference_matches(text):
+        ref = match["artifact_id"]
         if ref not in seen:
             refs.append(ref)
             seen.add(ref)
@@ -27,7 +58,20 @@ def extract_artifact_references(text: str) -> List[str]:
 
 def build_reference_audit(narrative_notes: str, artifacts: List[Dict[str, str]]) -> Dict[str, object]:
     """Compare [ART-###] references in notes against the structured artifact index."""
-    referenced_ids = extract_artifact_references(narrative_notes)
+    reference_matches = extract_artifact_reference_matches(narrative_notes)
+    referenced_ids = []
+    seen_refs = set()
+    non_standard_references = []
+    for ref_match in reference_matches:
+        ref = ref_match["artifact_id"]
+        if ref not in seen_refs:
+            referenced_ids.append(ref)
+            seen_refs.add(ref)
+        if not ref_match.get("is_standard"):
+            display_value = f"{ref_match.get('raw_text', '').strip()} -> {ref_match.get('standard_text', '')}"
+            if display_value not in non_standard_references:
+                non_standard_references.append(display_value)
+
     artifact_ids = []
     seen_artifacts = set()
     duplicate_artifact_ids = []
@@ -51,6 +95,8 @@ def build_reference_audit(narrative_notes: str, artifacts: List[Dict[str, str]])
         "missing_from_artifact_index": missing_from_index,
         "not_referenced_in_notes": not_referenced_in_notes,
         "duplicate_artifact_ids": duplicate_artifact_ids,
+        "non_standard_references": non_standard_references,
+        "preferred_reference_style": "[ART-001]",
         "reference_count": len(referenced_ids),
         "artifact_count": len(artifact_ids),
     }
@@ -64,6 +110,7 @@ def build_reference_audit_text(audit: Dict[str, object]) -> str:
     missing = audit.get("missing_from_artifact_index", [])
     unused = audit.get("not_referenced_in_notes", [])
     duplicates = audit.get("duplicate_artifact_ids", [])
+    non_standard = audit.get("non_standard_references", [])
 
     if missing:
         lines.append("References missing from artifact index: " + ", ".join(missing))
@@ -79,6 +126,11 @@ def build_reference_audit_text(audit: Dict[str, object]) -> str:
         lines.append("Duplicate artifact IDs: " + ", ".join(duplicates))
     else:
         lines.append("Duplicate artifact IDs: None")
+
+    if non_standard:
+        lines.append("References found outside preferred [ART-001] format: " + "; ".join(non_standard))
+    else:
+        lines.append("References found outside preferred [ART-001] format: None")
 
     return "\n".join(lines)
 

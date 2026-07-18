@@ -41,6 +41,7 @@ def add_reference_audit_section(document, record, artifacts):
         ("References Missing from Artifact Index", ", ".join(audit.get("missing_from_artifact_index", [])) or "None"),
         ("Indexed Artifacts Not Referenced in Notes", ", ".join(audit.get("not_referenced_in_notes", [])) or "None"),
         ("Duplicate Artifact IDs", ", ".join(audit.get("duplicate_artifact_ids", [])) or "None"),
+        ("References Outside Preferred [ART-001] Format", "; ".join(audit.get("non_standard_references", [])) or "None"),
     ]
     add_key_value_table(document, rows)
 
