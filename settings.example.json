@@ -20,7 +20,8 @@
   },
   "report_defaults": {
     "export_txt": true,
-    "export_docx": true
+    "export_docx": true,
+    "embed_artifact_images": true
   },
   "artifact_categories": [
     "Communication",

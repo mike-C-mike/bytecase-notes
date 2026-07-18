@@ -23,6 +23,34 @@ def set_document_defaults(document):
         style.font.bold = True
 
 
+def is_supported_image_path(path):
+    return Path(str(path or "")).suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff"}
+
+
+def add_artifact_image(document, artifact):
+    """Embed a supporting image/screenshot for an artifact when available.
+
+    This is intentionally non-blocking. If Word/python-docx cannot embed the
+    image, the report still exports and records the reason in the DOCX.
+    """
+    path_value = artifact.get("copied_supporting_file") or artifact.get("supporting_file_path")
+    if not path_value or not is_supported_image_path(path_value):
+        return
+
+    path = Path(path_value)
+    if not path.exists() or not path.is_file():
+        document.add_paragraph(f"Artifact image not embedded: file not found ({path_value})")
+        return
+
+    try:
+        document.add_paragraph("Supporting image / screenshot:")
+        paragraph = document.add_paragraph()
+        run = paragraph.add_run()
+        run.add_picture(str(path), width=Inches(4.75))
+    except Exception as exc:
+        document.add_paragraph(f"Artifact image not embedded: {exc}")
+
+
 def add_department_patch(document, department):
     """Add the configured department patch/logo to the DOCX header area when available."""
     patch_path = department.get("copied_department_patch") or department.get("department_patch_path")
@@ -108,6 +136,9 @@ def save_docx_notes(record, docx_path):
     else:
         document.add_paragraph("No narrative notes were entered.")
 
+    report_options = record.get("report_options", {})
+    embed_artifact_images = bool(report_options.get("embed_artifact_images", True))
+
     document.add_heading("Artifact Index", level=1)
     if artifacts:
         table = document.add_table(rows=1, cols=6)
@@ -130,10 +161,13 @@ def save_docx_notes(record, docx_path):
                 ("Date / Time", artifact.get("date_time", "")),
                 ("Supporting File", artifact.get("supporting_file_path", "")),
                 ("Copied Supporting File", artifact.get("copied_supporting_file", "")),
+                ("Supporting File Type", "Image / screenshot" if artifact.get("supporting_file_is_image") or is_supported_image_path(artifact.get("copied_supporting_file") or artifact.get("supporting_file_path")) else ""),
                 ("Supporting File Copy Error", artifact.get("attachment_copy_error", "")),
                 ("Summary", artifact.get("summary", "")),
                 ("Notes", artifact.get("notes", "")),
             ])
+            if embed_artifact_images:
+                add_artifact_image(document, artifact)
     else:
         document.add_paragraph("No artifact references were added.")
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 APP_NAME = "ByteCase Notes"
 APP_SUBTITLE = "Examiner Notes Workspace"
-APP_VERSION = "0.5.0"
+APP_VERSION = "0.6.0"
 SUITE_NAME = "ByteCase"
 PUBLISHER_NAME = "Forensics Byte"
 PRODUCT_DOMAIN = "byte-case.com"
@@ -39,7 +39,8 @@ DEFAULT_SETTINGS = {
     },
     "report_defaults": {
         "export_txt": True,
-        "export_docx": True
+        "export_docx": True,
+        "embed_artifact_images": True
     },
     "artifact_categories": [
         "Communication",
@@ -117,6 +118,7 @@ def normalize_settings(settings):
     settings["report_defaults"] = {
         "export_txt": bool(report_defaults.get("export_txt", True)),
         "export_docx": bool(report_defaults.get("export_docx", True)),
+        "embed_artifact_images": bool(report_defaults.get("embed_artifact_images", True)),
     }
     return settings
 

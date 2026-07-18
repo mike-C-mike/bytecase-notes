@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from bytecase_theme import apply_theme, configure_toplevel, get_current_theme, style_text_widget
-from notes_core import build_notes_record, build_reference_audit_text, load_notes_json, next_artifact_id, save_notes_outputs
+from notes_core import build_notes_record, build_reference_audit_text, is_supported_image_path, load_notes_json, next_artifact_id, save_notes_outputs
 from settings_service import (
     APP_NAME,
     APP_SUBTITLE,
@@ -201,7 +201,8 @@ class ByteCaseNotesApp:
         ttk.Button(buttons, text="Remove Selected", command=self.remove_selected_artifact).pack(side="left", padx=4)
         ttk.Button(buttons, text="Copy Ref", command=self.copy_selected_artifact_reference).pack(side="left", padx=4)
         ttk.Button(buttons, text="Insert Reference in Notes", command=self.insert_selected_artifact_reference).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Open Supporting File", command=self.open_selected_supporting_file).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Open File", command=self.open_selected_supporting_file).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Preview Image", command=self.preview_selected_artifact_image).pack(side="left", padx=4)
         ttk.Button(buttons, text="Next: Export", style="Accent.TButton", command=lambda: self.notebook.select(3)).pack(side="right", padx=4)
 
     def build_export_tab(self):
@@ -406,6 +407,26 @@ class ByteCaseNotesApp:
             os.startfile(path)
         except OSError as exc:
             messagebox.showerror("Open Supporting File", str(exc))
+
+    def preview_selected_artifact_image(self):
+        artifact = self.get_selected_artifact()
+        if not artifact:
+            messagebox.showinfo("Preview Image", "Select an artifact first.")
+            return
+        path = artifact.get("supporting_file_path") or artifact.get("copied_supporting_file")
+        if not path:
+            messagebox.showinfo("Preview Image", "The selected artifact does not have a supporting file path.")
+            return
+        if not is_supported_image_path(path):
+            messagebox.showinfo("Preview Image", "The selected supporting file does not appear to be a supported image file.")
+            return
+        if not os.path.exists(path):
+            messagebox.showerror("Preview Image", f"The image file was not found:\n\n{path}")
+            return
+        try:
+            os.startfile(path)
+        except OSError as exc:
+            messagebox.showerror("Preview Image", str(exc))
 
     def check_artifact_references(self):
         record = self.build_record()
@@ -669,6 +690,7 @@ class ArtifactWindow:
         buttons.grid(row=10, column=0, columnspan=2, sticky="e")
         ttk.Button(buttons, text="Cancel", command=self.window.destroy).pack(side="right", padx=4)
         ttk.Button(buttons, text="Save Artifact", style="Accent.TButton", command=self.save).pack(side="right", padx=4)
+        ttk.Button(buttons, text="Preview Image", command=self.preview_image).pack(side="right", padx=4)
 
     def load_values(self):
         if not self.artifact:
@@ -687,10 +709,29 @@ class ArtifactWindow:
     def browse_supporting_file(self):
         path = filedialog.askopenfilename(
             title="Select Supporting File or Screenshot",
-            filetypes=[("All Files", "*.*")],
+            filetypes=[
+                ("Image Files", "*.png *.jpg *.jpeg *.bmp *.gif *.tif *.tiff"),
+                ("All Files", "*.*"),
+            ],
         )
         if path:
             self.supporting_file_path_var.set(path)
+
+    def preview_image(self):
+        path = self.supporting_file_path_var.get().strip()
+        if not path:
+            messagebox.showinfo("Preview Image", "Select a supporting image or screenshot first.")
+            return
+        if not is_supported_image_path(path):
+            messagebox.showinfo("Preview Image", "The selected supporting file does not appear to be a supported image file.")
+            return
+        if not os.path.exists(path):
+            messagebox.showerror("Preview Image", f"The image file was not found:\n\n{path}")
+            return
+        try:
+            os.startfile(path)
+        except OSError as exc:
+            messagebox.showerror("Preview Image", str(exc))
 
     def save(self):
         artifact_id = self.artifact_id_var.get().strip()
@@ -786,6 +827,7 @@ class SettingsWindow:
         self.attachments_folder_var = tk.StringVar()
         self.export_txt_var = tk.BooleanVar(value=True)
         self.export_docx_var = tk.BooleanVar(value=True)
+        self.embed_artifact_images_var = tk.BooleanVar(value=True)
         ttk.Label(frame, text="ByteCase Output Root").grid(row=0, column=0, sticky="w", pady=5)
         ttk.Entry(frame, textvariable=self.output_root_var).grid(row=0, column=1, sticky="ew", pady=5)
         ttk.Button(frame, text="Browse", command=self.browse_output_root).grid(row=0, column=2, padx=4)
@@ -800,7 +842,8 @@ class SettingsWindow:
         ttk.Entry(frame, textvariable=self.attachments_folder_var).grid(row=4, column=1, sticky="ew", pady=5)
         ttk.Checkbutton(frame, text="Export TXT reports by default", variable=self.export_txt_var).grid(row=5, column=0, columnspan=3, sticky="w", pady=8)
         ttk.Checkbutton(frame, text="Export DOCX reports by default", variable=self.export_docx_var).grid(row=6, column=0, columnspan=3, sticky="w", pady=8)
-        ttk.Label(frame, text="JSON is always exported for continuity and later loading.", style="Muted.TLabel").grid(row=7, column=0, columnspan=4, sticky="w", pady=8)
+        ttk.Checkbutton(frame, text="Embed artifact images/screenshots in DOCX reports", variable=self.embed_artifact_images_var).grid(row=7, column=0, columnspan=3, sticky="w", pady=8)
+        ttk.Label(frame, text="JSON is always exported for continuity and later loading. Image embedding uses supporting files that are PNG/JPG/BMP/GIF/TIF/TIFF.", wraplength=700, style="Muted.TLabel").grid(row=8, column=0, columnspan=4, sticky="w", pady=8)
 
     def load_values(self):
         self.theme_var.set(self.settings.get("appearance", {}).get("theme", "system"))
@@ -818,6 +861,7 @@ class SettingsWindow:
         defaults = self.settings.get("report_defaults", {})
         self.export_txt_var.set(bool(defaults.get("export_txt", True)))
         self.export_docx_var.set(bool(defaults.get("export_docx", True)))
+        self.embed_artifact_images_var.set(bool(defaults.get("embed_artifact_images", True)))
 
     def browse_department_patch(self):
         path = filedialog.askopenfilename(
@@ -864,6 +908,7 @@ class SettingsWindow:
         self.settings["report_defaults"] = {
             "export_txt": self.export_txt_var.get(),
             "export_docx": self.export_docx_var.get(),
+            "embed_artifact_images": self.embed_artifact_images_var.get(),
         }
         save_settings(self.settings)
         self.app.refresh_after_settings()

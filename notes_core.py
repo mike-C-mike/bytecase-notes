@@ -19,7 +19,7 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff"}
 
 
 def is_supported_image_path(path: str) -> bool:
-    """Return True when the path looks like a supported department patch image."""
+    """Return True when the path looks like a supported image file."""
     return Path(path).suffix.lower() in IMAGE_EXTENSIONS
 
 
@@ -239,6 +239,7 @@ def copy_supporting_files(record: Dict[str, object], attachments_dir: Path) -> D
             shutil.copy2(source_path, destination_path)
             artifact["copied_supporting_file"] = str(destination_path)
             artifact["supporting_file_name"] = destination_path.name
+            artifact["supporting_file_is_image"] = is_supported_image_path(str(destination_path))
         except OSError as exc:
             artifact["attachment_copy_error"] = str(exc)
 
@@ -279,6 +280,9 @@ def build_notes_record(
         "narrative_notes": narrative_notes.strip(),
         "artifacts": artifacts,
         "limitations": limitations.strip(),
+        "report_options": {
+            "embed_artifact_images": bool(settings.get("report_defaults", {}).get("embed_artifact_images", True)),
+        },
         "reference_audit": build_reference_audit(narrative_notes, artifacts),
         "boundary_notice": (
             "ByteCase Notes helps examiners document observations and artifact references. "
@@ -335,6 +339,8 @@ def build_txt_notes(record: Dict[str, object]) -> str:
             lines.append(f"  Supporting File: {artifact.get('supporting_file_path', '')}")
             if artifact.get("copied_supporting_file"):
                 lines.append(f"  Copied Supporting File: {artifact.get('copied_supporting_file', '')}")
+            if artifact.get("supporting_file_is_image"):
+                lines.append("  Supporting File Type: Image / screenshot")
             if artifact.get("attachment_copy_error"):
                 lines.append(f"  Supporting File Copy Error: {artifact.get('attachment_copy_error', '')}")
             lines.append(f"  Date / Time: {artifact.get('date_time', '')}")

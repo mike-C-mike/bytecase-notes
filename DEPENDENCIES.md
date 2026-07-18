@@ -8,7 +8,7 @@
 | Tkinter / Tcl-Tk | GUI | Bundled with Python installers on Windows |
 | python-docx | DOCX report export | MIT License |
 
-No parsing libraries or forensic artifact extraction dependencies are used. Department patch/logo image embedding uses python-docx and supported image files; no additional image-processing dependency is added.
+No parsing libraries or forensic artifact extraction dependencies are used. Department patch/logo and artifact image/screenshot embedding use python-docx and supported image files. No additional image-processing dependency is added.
 
 ## Build
 

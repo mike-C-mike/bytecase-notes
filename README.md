@@ -7,7 +7,7 @@ It is part of the **ByteCase** toolset by **Forensics Byte**.
 ## Version
 
 ```text
-v0.5.0 - Department patch / logo upload support
+v0.6.0 - Artifact image preview and DOCX embedding
 ```
 
 ## What this tool does
@@ -27,7 +27,9 @@ ByteCase Notes helps an examiner:
 - Save structured JSON for continuity.
 - Reopen prior ByteCase Notes JSON workspaces.
 - Add optional supporting files or screenshots to artifact references.
+- Preview selected artifact images/screenshots using the system image viewer.
 - Copy supporting files into the case notes attachments folder during export.
+- Embed artifact images/screenshots in DOCX reports when enabled.
 - Copy selected artifact references to the clipboard.
 - Open a selected artifact's supporting file from the artifact index.
 - Export optional TXT and DOCX reports.
@@ -57,9 +59,10 @@ It is a documentation and workflow companion.
 5. Use Insert Note Block when a simple structure helps.
 6. Use Check Refs to compare narrative references against the artifact index.
 7. Add optional supporting files/screenshots to artifact references.
-8. Optional: add a department patch/logo in Settings for branded DOCX exports.
-9. Review and export.
-10. Reopen the saved JSON later when the notes need to continue.
+8. Preview selected images/screenshots when needed.
+9. Optional: add a department patch/logo in Settings for branded DOCX exports.
+10. Review and export.
+11. Reopen the saved JSON later when the notes need to continue.
 ```
 
 ## Reference check
@@ -101,6 +104,19 @@ Current blocks:
 These blocks are only writing aids. The examiner should edit or delete any fields that do not apply.
 
 
+## Artifact images / screenshots
+
+Artifact records include a **Supporting File / Screenshot** field. Use it for a screenshot, exported image, PDF, text export, or other file that supports the note entry.
+
+When the supporting file is an image (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.gif`, `.tif`, or `.tiff`), ByteCase Notes can:
+
+- Open the image with the system viewer from the artifact index.
+- Copy the image into the case notes `attachments` folder during export.
+- Mark the copied supporting file as an image in JSON/TXT/DOCX outputs.
+- Embed the image under that artifact in the DOCX report when **Embed artifact images/screenshots in DOCX reports** is enabled.
+
+Image embedding is optional and non-blocking. If an image cannot be embedded, the report still exports and records the issue.
+
 ## Department patch / logo
 
 Settings includes an optional **Department Patch / Logo** image path. Use **Browse** to select a local image file such as a PNG or JPG department patch.
@@ -132,7 +148,7 @@ ByteCase\
       attachments\
 ```
 
-JSON is always exported. TXT and DOCX follow Settings defaults. Supporting files listed on artifact records are copied into `attachments` during export when the source file is available. Department patch/logo images are copied into `attachments\branding` during export when configured and available.
+JSON is always exported. TXT and DOCX follow Settings defaults. Supporting files listed on artifact records are copied into `attachments` during export when the source file is available. Image supporting files can be embedded in DOCX reports when enabled. Department patch/logo images are copied into `attachments\branding` during export when configured and available.
 
 ## Dependency notes
 
