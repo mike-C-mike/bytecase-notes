@@ -7,7 +7,7 @@ It is part of the **ByteCase** toolset by **Forensics Byte**.
 ## Version
 
 ```text
-v0.8.0 - Streamlined readiness and artifact insertion
+v0.9.0 - Release candidate prep
 ```
 
 ## What this tool does
@@ -81,17 +81,23 @@ Suggested use:
 11. Reopen the saved JSON later when the notes need to continue.
 ```
 
-## v0.8.0 polish notes
+## v0.9.0 release candidate notes
 
-This sprint continues the simplification pass. The goal is to help the examiner see what is ready, what needs attention, and how to add artifact references with fewer clicks.
+This sprint prepares ByteCase Notes for a GitHub pre-release candidate. The app keeps the simplified workflow from prior polish rounds and adds the files needed to build, package, verify, and publish a Windows pre-release.
 
-Changes include:
+Release prep additions include:
 
-- New Ready Check section on the Start page.
-- Readiness status for case number, notes/artifacts, artifact count, reference issues, and export blockers/warnings.
-- One-step Save + Insert Ref action in the artifact window.
-- Cleaner artifact save button labels.
-- No new runtime dependencies.
+- Build instructions.
+- PowerShell release build script.
+- PyInstaller spec file.
+- Release checklist.
+- Known limitations.
+- Unsigned Windows notice.
+- Simple workflow guide.
+- Requirements files.
+- MIT license file.
+
+No new runtime dependencies were added.
 
 ## Reference check
 
@@ -190,4 +196,4 @@ Runtime dependencies:
 
 ## License
 
-This project is intended for MIT License release.
+This project is released under the MIT License. See `LICENSE`.
