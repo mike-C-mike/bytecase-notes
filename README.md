@@ -7,13 +7,14 @@ It is part of the **ByteCase** toolset by **Forensics Byte**.
 ## Version
 
 ```text
-v0.6.0 - Artifact image preview and DOCX embedding
+v0.8.0 - Streamlined readiness and artifact insertion
 ```
 
 ## What this tool does
 
 ByteCase Notes helps an examiner:
 
+- Use a simple Start page with quick workflow actions and a readiness check.
 - Record narrative examination notes.
 - Add manually identified artifact references.
 - Assign artifact IDs such as `ART-001`.
@@ -34,6 +35,8 @@ ByteCase Notes helps an examiner:
 - Open a selected artifact's supporting file from the artifact index.
 - Export optional TXT and DOCX reports.
 - Save a department patch/logo image in Settings for DOCX branding and case packet capture.
+- Review a workspace snapshot before export.
+- Save an artifact and insert its reference into notes in one step.
 
 ## What this tool does not do
 
@@ -51,19 +54,44 @@ It is a documentation and workflow companion.
 
 ## Basic workflow
 
+The app is organized around a simple workflow:
+
+```text
+1. Case
+2. Notes
+3. Artifacts
+4. Export
+```
+
+A **Start** page provides quick actions for continuing notes, adding an artifact, checking references, and moving to export. It also includes a **Ready Check** so the examiner can quickly see whether the workspace is missing case information, notes/artifacts, or artifact reference cleanup.
+
+Suggested use:
+
 ```text
 1. Enter case information.
 2. Write narrative notes.
 3. Add artifact references.
-4. Reference artifacts in notes using [ART-001], [ART-002], etc.
-5. Use Insert Note Block when a simple structure helps.
-6. Use Check Refs to compare narrative references against the artifact index.
-7. Add optional supporting files/screenshots to artifact references.
-8. Preview selected images/screenshots when needed.
+4. Use **Save + Insert Ref** when adding an artifact to immediately place `[ART-001]` into the narrative.
+5. Reference artifacts in notes using [ART-001], [ART-002], etc.
+6. Use Note Block when a simple structure helps.
+7. Use Check Refs to compare narrative references against the artifact index.
+8. Add optional supporting files/screenshots to artifact references.
 9. Optional: add a department patch/logo in Settings for branded DOCX exports.
 10. Review and export.
 11. Reopen the saved JSON later when the notes need to continue.
 ```
+
+## v0.8.0 polish notes
+
+This sprint continues the simplification pass. The goal is to help the examiner see what is ready, what needs attention, and how to add artifact references with fewer clicks.
+
+Changes include:
+
+- New Ready Check section on the Start page.
+- Readiness status for case number, notes/artifacts, artifact count, reference issues, and export blockers/warnings.
+- One-step Save + Insert Ref action in the artifact window.
+- Cleaner artifact save button labels.
+- No new runtime dependencies.
 
 ## Reference check
 

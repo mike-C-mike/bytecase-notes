@@ -73,7 +73,7 @@ class ByteCaseNotesApp:
 
         self.root.title(f"{APP_NAME} v{APP_VERSION}")
         self.root.geometry("1180x780")
-        self.root.minsize(1080, 700)
+        self.root.minsize(1080, 720)
 
         self.build_gui()
         self.load_defaults()
@@ -88,18 +88,121 @@ class ByteCaseNotesApp:
         ttk.Label(header, text=f"{APP_NAME} v{APP_VERSION}", style="Title.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(header, text=f"{APP_SUBTITLE} · {PUBLISHER_NAME} · {PRODUCT_DOMAIN}", style="Muted.TLabel").grid(row=1, column=0, sticky="w")
         ttk.Button(header, text="New", command=self.clear_workspace).grid(row=0, column=1, rowspan=2, padx=4)
-        ttk.Button(header, text="Open Notes JSON", command=self.load_notes_workspace).grid(row=0, column=2, rowspan=2, padx=4)
+        ttk.Button(header, text="Open JSON", command=self.load_notes_workspace).grid(row=0, column=2, rowspan=2, padx=4)
         ttk.Button(header, text="Settings", command=self.open_settings_window).grid(row=0, column=3, rowspan=2, padx=4)
         ttk.Button(header, text="About", command=self.open_about).grid(row=0, column=4, rowspan=2, padx=4)
-        ttk.Button(header, text="Open Output", command=self.open_output_folder).grid(row=0, column=5, rowspan=2, padx=4)
+        ttk.Button(header, text="Output", command=self.open_output_folder).grid(row=0, column=5, rowspan=2, padx=4)
 
         self.notebook = ttk.Notebook(self.root)
         self.notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
 
+        self.build_start_tab()
         self.build_case_tab()
         self.build_notes_tab()
         self.build_artifacts_tab()
         self.build_export_tab()
+
+    def build_start_tab(self):
+        frame = ScrollableFrame(self.notebook, self.colors)
+        self.notebook.add(frame, text="Start")
+        body = frame.inner
+        body.columnconfigure(0, weight=1)
+
+        ttk.Label(body, text="ByteCase Notes workflow", style="Title.TLabel").grid(row=0, column=0, sticky="w", pady=(8, 6))
+        ttk.Label(
+            body,
+            text="Simple flow: identify the case, write notes, add artifact references, then export the notes packet.",
+            style="Muted.TLabel",
+            wraplength=980,
+        ).grid(row=1, column=0, sticky="w", pady=(0, 14))
+
+        cards = ttk.Frame(body)
+        cards.grid(row=2, column=0, sticky="ew", pady=8)
+        for index in range(4):
+            cards.columnconfigure(index, weight=1)
+
+        self.add_start_card(cards, 0, "1", "Case", "Add case and examiner details.", lambda: self.notebook.select(1))
+        self.add_start_card(cards, 1, "2", "Notes", "Write the examiner narrative.", lambda: self.notebook.select(2))
+        self.add_start_card(cards, 2, "3", "Artifacts", "Add items to reference as [ART-001].", lambda: self.notebook.select(3))
+        self.add_start_card(cards, 3, "4", "Export", "Check refs and save outputs.", lambda: self.notebook.select(4))
+
+        quick = ttk.LabelFrame(body, text="Quick actions", padding=12)
+        quick.grid(row=3, column=0, sticky="ew", pady=16)
+        ttk.Button(quick, text="Continue Notes", style="Accent.TButton", command=lambda: self.notebook.select(2)).pack(side="left", padx=4)
+        ttk.Button(quick, text="Add Artifact", command=self.open_artifact_window).pack(side="left", padx=4)
+        ttk.Button(quick, text="Check Refs", command=self.check_artifact_references).pack(side="left", padx=4)
+        ttk.Button(quick, text="Review Export", command=lambda: self.notebook.select(4)).pack(side="left", padx=4)
+
+        readiness = ttk.LabelFrame(body, text="Ready check", padding=12)
+        readiness.grid(row=4, column=0, sticky="ew", pady=8)
+        self.readiness_var = tk.StringVar(value="Add case information, notes, and artifacts as needed.")
+        ttk.Label(readiness, textvariable=self.readiness_var, wraplength=980).pack(fill="x")
+
+        summary = ttk.LabelFrame(body, text="Workspace snapshot", padding=12)
+        summary.grid(row=5, column=0, sticky="ew", pady=8)
+        self.start_summary_var = tk.StringVar(value="No case loaded yet.")
+        ttk.Label(summary, textvariable=self.start_summary_var, wraplength=980).pack(fill="x")
+
+        tip = (
+            "Tip: Add artifacts as you find them, then reference them directly in notes using [ART-001]. "
+            "Run Check Refs before export to catch missing or unused references."
+        )
+        ttk.Label(body, text=tip, style="Muted.TLabel", wraplength=980).grid(row=6, column=0, sticky="w", pady=(14, 0))
+
+    def add_start_card(self, parent, column, number, title, description, command):
+        card = ttk.LabelFrame(parent, text=f"Step {number}: {title}", padding=10)
+        card.grid(row=0, column=column, sticky="nsew", padx=5)
+        ttk.Label(card, text=description, wraplength=210, style="Muted.TLabel").pack(anchor="w", fill="x", pady=(0, 8))
+        ttk.Button(card, text="Open", command=command).pack(anchor="e")
+
+    def refresh_start_summary(self):
+        if not hasattr(self, "start_summary_var"):
+            return
+        case_number = self.case_number_var.get().strip() if hasattr(self, "case_number_var") else ""
+        examiner = self.examiner_var.get().strip() if hasattr(self, "examiner_var") else ""
+        note_chars = len(self.notes_text.get("1.0", "end").strip()) if hasattr(self, "notes_text") else 0
+        artifact_count = len(self.artifacts)
+        self.start_summary_var.set(
+            f"Case: {case_number or '(not set)'}\n"
+            f"Examiner: {examiner or '(not set)'}\n"
+            f"Narrative notes: {note_chars} characters\n"
+            f"Artifacts indexed: {artifact_count}"
+        )
+        if hasattr(self, "readiness_var") and hasattr(self, "notes_text") and hasattr(self, "case_number_var"):
+            self.readiness_var.set(self.build_readiness_text())
+
+    def build_readiness_text(self):
+        record = self.build_record()
+        errors, warnings = validate_notes_record(record)
+        audit = record.get("reference_audit", {})
+        case_number = record.get("case_info", {}).get("case_number", "")
+        notes_present = bool(record.get("narrative_notes", "").strip())
+        artifact_count = len(record.get("artifacts", []))
+        missing_refs = audit.get("missing_from_artifact_index", [])
+        duplicates = audit.get("duplicate_artifact_ids", [])
+        non_standard = audit.get("non_standard_references", [])
+
+        lines = [
+            ("✓ Case number entered" if case_number else "• Case number not entered yet"),
+            ("✓ Notes or artifacts present" if notes_present or artifact_count else "• Add narrative notes or at least one artifact before export"),
+            (f"✓ {artifact_count} artifact(s) indexed" if artifact_count else "• No artifacts indexed yet"),
+        ]
+        if missing_refs:
+            lines.append("• References missing from artifact index: " + ", ".join(missing_refs))
+        elif duplicates:
+            lines.append("• Duplicate artifact IDs found: " + ", ".join(duplicates))
+        elif non_standard:
+            lines.append("• Some references are readable but not in preferred [ART-001] format")
+        else:
+            lines.append("✓ Reference check has no missing or duplicate artifact IDs")
+
+        if errors:
+            lines.append("Blocking before export: " + "; ".join(errors))
+        elif warnings:
+            lines.append("Review before export: " + "; ".join(warnings[:2]))
+        else:
+            lines.append("Ready for review/export when your notes are complete.")
+        return "\n".join(lines)
 
     def build_case_tab(self):
         frame = ScrollableFrame(self.notebook, self.colors)
@@ -130,7 +233,7 @@ class ByteCaseNotesApp:
         )
         ttk.Label(body, text=notice, wraplength=920, style="Muted.TLabel").grid(row=8, column=0, columnspan=3, sticky="w", pady=(20, 0))
 
-        ttk.Button(body, text="Next: Notes", style="Accent.TButton", command=lambda: self.notebook.select(1)).grid(row=9, column=2, sticky="e", pady=18)
+        ttk.Button(body, text="Next: Notes", style="Accent.TButton", command=lambda: self.notebook.select(2)).grid(row=9, column=2, sticky="e", pady=18)
 
     def build_notes_tab(self):
         frame = ttk.Frame(self.notebook, padding=10)
@@ -146,12 +249,12 @@ class ByteCaseNotesApp:
 
         button_row = ttk.Frame(frame)
         button_row.grid(row=1, column=0, sticky="ew", pady=(8, 8))
-        ttk.Button(button_row, text="Insert Selected Artifact Reference", command=self.insert_selected_artifact_reference).pack(side="left", padx=4)
+        ttk.Button(button_row, text="Insert Ref", command=self.insert_selected_artifact_reference).pack(side="left", padx=4)
         ttk.Button(button_row, text="Add Artifact", command=self.open_artifact_window).pack(side="left", padx=4)
+        ttk.Button(button_row, text="Note Block", command=self.open_note_block_window).pack(side="left", padx=4)
         ttk.Button(button_row, text="Check Refs", command=self.check_artifact_references).pack(side="left", padx=4)
         ttk.Button(button_row, text="Ref Help", command=self.open_reference_help).pack(side="left", padx=4)
-        ttk.Button(button_row, text="Insert Note Block", command=self.open_note_block_window).pack(side="left", padx=4)
-        ttk.Button(button_row, text="Next: Artifacts", style="Accent.TButton", command=lambda: self.notebook.select(2)).pack(side="right", padx=4)
+        ttk.Button(button_row, text="Next", style="Accent.TButton", command=lambda: self.notebook.select(3)).pack(side="right", padx=4)
 
         text_frame = ttk.Frame(frame)
         text_frame.grid(row=2, column=0, sticky="nsew")
@@ -163,6 +266,7 @@ class ByteCaseNotesApp:
         y.grid(row=0, column=1, sticky="ns")
         self.notes_text.configure(yscrollcommand=y.set)
         style_text_widget(self.notes_text, self.colors)
+        self.notes_text.bind("<KeyRelease>", lambda _event=None: self.refresh_start_summary())
 
     def build_artifacts_tab(self):
         frame = ttk.Frame(self.notebook, padding=10)
@@ -200,10 +304,10 @@ class ByteCaseNotesApp:
         ttk.Button(buttons, text="Edit Selected", command=self.edit_selected_artifact).pack(side="left", padx=4)
         ttk.Button(buttons, text="Remove Selected", command=self.remove_selected_artifact).pack(side="left", padx=4)
         ttk.Button(buttons, text="Copy Ref", command=self.copy_selected_artifact_reference).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Insert Reference in Notes", command=self.insert_selected_artifact_reference).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Insert Ref", command=self.insert_selected_artifact_reference).pack(side="left", padx=4)
         ttk.Button(buttons, text="Open File", command=self.open_selected_supporting_file).pack(side="left", padx=4)
         ttk.Button(buttons, text="Preview Image", command=self.preview_selected_artifact_image).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Next: Export", style="Accent.TButton", command=lambda: self.notebook.select(3)).pack(side="right", padx=4)
+        ttk.Button(buttons, text="Next", style="Accent.TButton", command=lambda: self.notebook.select(4)).pack(side="right", padx=4)
 
     def build_export_tab(self):
         frame = ScrollableFrame(self.notebook, self.colors)
@@ -225,11 +329,11 @@ class ByteCaseNotesApp:
 
         buttons = ttk.Frame(body)
         buttons.grid(row=5, column=0, sticky="ew", pady=12)
-        ttk.Button(buttons, text="Review Summary", command=self.review_summary).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Review", command=self.review_summary).pack(side="left", padx=4)
         ttk.Button(buttons, text="Check Refs", command=self.check_artifact_references).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Export Notes", style="Accent.TButton", command=self.export_notes).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Save + Open Folder", command=self.export_and_open).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Open Last Folder", command=self.open_last_folder).pack(side="right", padx=4)
+        ttk.Button(buttons, text="Export", style="Accent.TButton", command=self.export_notes).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Export + Open", command=self.export_and_open).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Open Last", command=self.open_last_folder).pack(side="right", padx=4)
 
     def add_labeled_entry(self, parent, label, variable, row):
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=5, padx=(0, 8))
@@ -290,6 +394,7 @@ class ByteCaseNotesApp:
         self.artifacts = []
         self.refresh_artifact_tree()
         self.summary_var.set("New notes workspace started.")
+        self.refresh_start_summary()
         self.notebook.select(0)
 
     def load_notes_workspace(self):
@@ -306,7 +411,8 @@ class ByteCaseNotesApp:
             return
         self.populate_from_record(record)
         self.summary_var.set(f"Loaded notes workspace from:\n{path}")
-        self.notebook.select(1)
+        self.refresh_start_summary()
+        self.notebook.select(2)
 
     def populate_from_record(self, record):
         case_info = record.get("case_info", {})
@@ -326,6 +432,7 @@ class ByteCaseNotesApp:
         artifacts = record.get("artifacts", [])
         self.artifacts = artifacts if isinstance(artifacts, list) else []
         self.refresh_artifact_tree()
+        self.refresh_start_summary()
 
     def open_artifact_window(self, artifact=None):
         ArtifactWindow(self, artifact=artifact)
@@ -351,6 +458,7 @@ class ByteCaseNotesApp:
             return
         self.artifacts = [item for item in self.artifacts if item.get("artifact_id") != artifact_id]
         self.refresh_artifact_tree()
+        self.refresh_start_summary()
 
     def save_artifact(self, artifact):
         existing_id = artifact.get("artifact_id")
@@ -361,6 +469,7 @@ class ByteCaseNotesApp:
         else:
             self.artifacts.append(artifact)
         self.refresh_artifact_tree()
+        self.refresh_start_summary()
 
     def insert_selected_artifact_reference(self):
         selected = self.artifact_tree.selection()
@@ -371,7 +480,7 @@ class ByteCaseNotesApp:
             return
         ref = f"[{selected[0]}]"
         self.notes_text.insert("insert", ref)
-        self.notebook.select(1)
+        self.notebook.select(2)
         self.notes_text.focus_set()
 
     def copy_selected_artifact_reference(self):
@@ -498,7 +607,7 @@ class ByteCaseNotesApp:
         if not block:
             return
         self.notes_text.insert("insert", block)
-        self.notebook.select(1)
+        self.notebook.select(2)
         self.notes_text.focus_set()
 
     def review_summary(self):
@@ -522,6 +631,7 @@ class ByteCaseNotesApp:
         if errors:
             summary.append("Blocking issue: " + "; ".join(errors))
         self.summary_var.set("\n".join(summary))
+        self.refresh_start_summary()
 
     def export_notes(self):
         record = self.build_record()
@@ -539,6 +649,7 @@ class ByteCaseNotesApp:
             self.last_saved_folder = first_path.parent
             details = "\n\n".join([f"{key}:\n{path}" for key, path in outputs.items()])
             messagebox.showinfo("Notes Exported", "ByteCase Notes exported successfully.\n\n" + details)
+            self.refresh_start_summary()
             return outputs
         except Exception as e:
             messagebox.showerror("Export Error", f"Could not export notes.\n\nDetails:\n{e}")
@@ -583,6 +694,7 @@ class ByteCaseNotesApp:
         style_text_widget(self.notes_text, self.colors)
         style_text_widget(self.limitations_text, self.colors)
         self.load_defaults()
+        self.refresh_start_summary()
 
 
 class NoteBlockWindow:
@@ -689,7 +801,8 @@ class ArtifactWindow:
         buttons = ttk.Frame(self.window, padding=10)
         buttons.grid(row=10, column=0, columnspan=2, sticky="e")
         ttk.Button(buttons, text="Cancel", command=self.window.destroy).pack(side="right", padx=4)
-        ttk.Button(buttons, text="Save Artifact", style="Accent.TButton", command=self.save).pack(side="right", padx=4)
+        ttk.Button(buttons, text="Save", style="Accent.TButton", command=self.save).pack(side="right", padx=4)
+        ttk.Button(buttons, text="Save + Insert Ref", command=lambda: self.save(insert_reference=True)).pack(side="right", padx=4)
         ttk.Button(buttons, text="Preview Image", command=self.preview_image).pack(side="right", padx=4)
 
     def load_values(self):
@@ -733,7 +846,7 @@ class ArtifactWindow:
         except OSError as exc:
             messagebox.showerror("Preview Image", str(exc))
 
-    def save(self):
+    def save(self, insert_reference=False):
         artifact_id = self.artifact_id_var.get().strip()
         if not artifact_id:
             messagebox.showerror("Artifact Error", "Artifact ID is required.")
@@ -751,6 +864,10 @@ class ArtifactWindow:
             "notes": self.notes_text.get("1.0", "end").strip(),
         }
         self.app.save_artifact(artifact)
+        if insert_reference:
+            self.app.notes_text.insert("insert", f"[{artifact_id}]")
+            self.app.notebook.select(2)
+            self.app.notes_text.focus_set()
         self.window.destroy()
 
 
